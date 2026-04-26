@@ -8,6 +8,9 @@ import {
   UpdateScorecardInput,
   PortfolioSummary,
   BackupData,
+  Deal,
+  CreateDealInput,
+  UpdateDealInput,
 } from '@northstar/shared-types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -62,6 +65,16 @@ export const api = {
   portfolio: {
     summary: (year: number, period: 'H1' | 'H2') =>
       request<PortfolioSummary>(`/portfolio/summary?year=${year}&period=${period}`),
+  },
+
+  deals: {
+    list: () => request<Deal[]>('/deals'),
+    create: (input: CreateDealInput) =>
+      request<Deal>('/deals', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: UpdateDealInput) =>
+      request<Deal>(`/deals/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+    delete: (id: string) =>
+      request<{ id: string }>(`/deals/${id}`, { method: 'DELETE' }),
   },
 
   backup: {

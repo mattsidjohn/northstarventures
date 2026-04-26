@@ -3,7 +3,7 @@ import AppShell from './components/layout/AppShell'
 import Dashboard from './pages/Dashboard'
 import PropertyList from './pages/PropertyList'
 import PropertyDetail from './pages/PropertyDetail'
-import Comparison from './pages/Comparison'
+import DealAnalyzer from './pages/DealAnalyzer'
 
 const router = createBrowserRouter([
   {
@@ -14,7 +14,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'properties', element: <PropertyList /> },
       { path: 'properties/:id', element: <PropertyDetail /> },
-{ path: 'comparison', element: <Comparison /> },
+      { path: 'deal-analyzer', element: <DealAnalyzer /> },
     ],
   },
 ])

@@ -5,6 +5,7 @@ import monthlyDataRouter from './routes/monthlyData'
 import scorecardsRouter from './routes/scorecards'
 import portfolioRouter from './routes/portfolio'
 import backupRouter from './routes/backup'
+import dealsRouter from './routes/deals'
 
 const app = express()
 const PORT = process.env.PORT ?? 3001
@@ -17,6 +18,7 @@ app.use('/api/properties/:id/monthly', monthlyDataRouter)
 app.use('/api/properties/:id/scorecards', scorecardsRouter)
 app.use('/api/portfolio', portfolioRouter)
 app.use('/api/backup', backupRouter)
+app.use('/api/deals', dealsRouter)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
