@@ -1,0 +1,18 @@
+{
+  "name": "North Star Ventures",
+  "short_name": "North Star",
+  "description": "Property portfolio scorecard and management",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F2F2F7",
+  "theme_color": "#007AFF",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
