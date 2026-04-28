@@ -14,6 +14,10 @@ import { formatCurrency, formatPercent } from '../utils/format'
 
 // ── Print / PDF ───────────────────────────────────────────────────────────
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 function scoreColor(score: number): string {
   if (score >= 5) return '#059669'
   if (score >= 4) return '#16a34a'
@@ -74,7 +78,7 @@ function printDeal(form: FormState, result: ProFormaResult): void {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Deal Analysis — ${form.name || 'Untitled'}</title>
+  <title>Deal Analysis — ${escapeHtml(form.name || 'Untitled')}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111827; background: white; font-size: 13px; line-height: 1.4; }
@@ -95,8 +99,8 @@ function printDeal(form: FormState, result: ProFormaResult): void {
   <div style="background:#0f172a;color:white;padding:18px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
       <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">North Star Ventures · Deal Analysis</div>
-      <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${form.name || 'Untitled Deal'}</div>
-      ${form.address ? `<div style="font-size:12px;color:#94a3b8;">${form.address}</div>` : ''}
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${escapeHtml(form.name || 'Untitled Deal')}</div>
+      ${form.address ? `<div style="font-size:12px;color:#94a3b8;">${escapeHtml(form.address)}</div>` : ''}
       <div style="font-size:11px;color:#64748b;margin-top:4px;">${propLabel}${form.units > 1 ? ` · ${form.units} units` : ''}${form.sqft ? ` · ${form.sqft.toLocaleString()} sqft` : ''}</div>
     </div>
     <div style="text-align:right;">

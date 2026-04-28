@@ -38,6 +38,13 @@ router.post('/', (req: Request, res: Response) => {
   const db = getDb()
   const { year, period } = req.body as { year: number; period: 'H1' | 'H2' }
 
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return res.status(400).json({ success: false, error: 'Invalid year' })
+  }
+  if (period !== 'H1' && period !== 'H2') {
+    return res.status(400).json({ success: false, error: 'Invalid period — must be H1 or H2' })
+  }
+
   const propertyExists = db.prepare('SELECT id FROM properties WHERE id = ?').get(req.params.id)
   if (!propertyExists) return res.status(404).json({ success: false, error: 'Property not found' })
 

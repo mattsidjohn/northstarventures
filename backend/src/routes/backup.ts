@@ -27,7 +27,12 @@ router.post('/import', (req: Request, res: Response) => {
   const db = getDb()
   const backup = req.body as BackupData
 
-  if (!backup.version || !Array.isArray(backup.properties)) {
+  if (
+    !backup.version ||
+    !Array.isArray(backup.properties) ||
+    !Array.isArray(backup.monthlyData) ||
+    !Array.isArray(backup.scorecards)
+  ) {
     return res.status(400).json({ success: false, error: 'Invalid backup format' })
   }
 

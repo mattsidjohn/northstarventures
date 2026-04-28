@@ -9,8 +9,14 @@ const router = Router()
 
 router.get('/summary', (req: Request, res: Response) => {
   const db = getDb()
-  const year = parseInt(req.query.year as string) || new Date().getFullYear()
-  const period = (req.query.period as 'H1' | 'H2') || (new Date().getMonth() < 6 ? 'H1' : 'H2')
+  const rawYear = parseInt(req.query.year as string)
+  const year = Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= 2100
+    ? rawYear
+    : new Date().getFullYear()
+  const rawPeriod = req.query.period as string
+  const period: 'H1' | 'H2' = (rawPeriod === 'H1' || rawPeriod === 'H2')
+    ? rawPeriod
+    : (new Date().getMonth() < 6 ? 'H1' : 'H2')
 
   const propertyRows = db.prepare('SELECT * FROM properties').all() as Record<string, unknown>[]
   const allMonthly = db.prepare('SELECT * FROM monthly_data').all() as Record<string, unknown>[]
