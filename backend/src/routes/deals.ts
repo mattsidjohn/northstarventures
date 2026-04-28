@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { v4 as uuid } from 'uuid'
-import { getDb } from '../db/database'
+import { createUserClient } from '../lib/supabase'
 import { Deal, CreateDealInput, UpdateDealInput } from '@northstar/shared-types'
 
 const router = Router()
@@ -31,82 +30,118 @@ function rowToDeal(row: Record<string, unknown>): Deal {
   }
 }
 
-router.get('/', (_req: Request, res: Response) => {
-  const db = getDb()
-  const rows = db
-    .prepare('SELECT * FROM deals ORDER BY created_at DESC')
-    .all() as Record<string, unknown>[]
-  res.json({ success: true, data: rows.map(rowToDeal) })
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { data, error } = await db
+      .from('deals')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: (data ?? []).map(rowToDeal) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.post('/', (req: Request, res: Response) => {
-  const db = getDb()
-  const input = req.body as CreateDealInput
-  const now = new Date().toISOString()
-  const id = uuid()
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const input = req.body as CreateDealInput
 
-  db.prepare(`
-    INSERT INTO deals (
-      id, name, address, property_type, units, sqft,
-      purchase_price, monthly_rent, financing_type, interest_rate, loan_amount, pm_percent,
-      vacancy_pct, maintenance_reserve_pct, insurance_pct, tax_pct,
-      notes, status, converted_property_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, input.name, input.address ?? '', input.propertyType ?? 'single-family',
-    input.units ?? 1, input.sqft ?? null,
-    input.purchasePrice ?? 0, input.monthlyRent ?? 0,
-    input.financingType ?? 'interest-only', input.interestRate ?? 7,
-    input.loanAmount ?? 0, input.pmPercent ?? 10,
-    input.vacancyPct ?? 5, input.maintenanceReservePct ?? 10,
-    input.insurancePct ?? 0.5, input.taxPct ?? 1.2,
-    input.notes ?? null, input.status ?? 'active',
-    input.convertedPropertyId ?? null, now, now
-  )
+    const { data, error } = await db
+      .from('deals')
+      .insert({
+        user_id: req.userId,
+        name: input.name,
+        address: input.address ?? '',
+        property_type: input.propertyType ?? 'single-family',
+        units: input.units ?? 1,
+        sqft: input.sqft ?? null,
+        purchase_price: input.purchasePrice ?? 0,
+        monthly_rent: input.monthlyRent ?? 0,
+        financing_type: input.financingType ?? 'interest-only',
+        interest_rate: input.interestRate ?? 7,
+        loan_amount: input.loanAmount ?? 0,
+        pm_percent: input.pmPercent ?? 10,
+        vacancy_pct: input.vacancyPct ?? 5,
+        maintenance_reserve_pct: input.maintenanceReservePct ?? 10,
+        insurance_pct: input.insurancePct ?? 0.5,
+        tax_pct: input.taxPct ?? 1.2,
+        notes: input.notes ?? null,
+        status: input.status ?? 'active',
+        converted_property_id: input.convertedPropertyId ?? null,
+      })
+      .select()
+      .single()
 
-  const saved = db.prepare('SELECT * FROM deals WHERE id = ?').get(id) as Record<string, unknown>
-  res.status(201).json({ success: true, data: rowToDeal(saved) })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.status(201).json({ success: true, data: rowToDeal(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.put('/:id', (req: Request, res: Response) => {
-  const db = getDb()
-  const input = req.body as UpdateDealInput
-  const now = new Date().toISOString()
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const input = req.body as UpdateDealInput
 
-  const existing = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
-  if (!existing) return res.status(404).json({ success: false, error: 'Deal not found' })
+    const { data: existing, error: fetchErr } = await db
+      .from('deals')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+    if (fetchErr || !existing) return res.status(404).json({ success: false, error: 'Deal not found' })
 
-  const merged = { ...rowToDeal(existing), ...input }
+    const merged = { ...rowToDeal(existing), ...input }
 
-  db.prepare(`
-    UPDATE deals SET
-      name = ?, address = ?, property_type = ?, units = ?, sqft = ?,
-      purchase_price = ?, monthly_rent = ?, financing_type = ?, interest_rate = ?,
-      loan_amount = ?, pm_percent = ?,
-      vacancy_pct = ?, maintenance_reserve_pct = ?, insurance_pct = ?, tax_pct = ?,
-      notes = ?, status = ?, converted_property_id = ?,
-      updated_at = ?
-    WHERE id = ?
-  `).run(
-    merged.name, merged.address, merged.propertyType, merged.units, merged.sqft ?? null,
-    merged.purchasePrice, merged.monthlyRent, merged.financingType, merged.interestRate,
-    merged.loanAmount, merged.pmPercent,
-    merged.vacancyPct ?? 5, merged.maintenanceReservePct ?? 10,
-    merged.insurancePct ?? 0.5, merged.taxPct ?? 1.2,
-    merged.notes ?? null, merged.status, merged.convertedPropertyId ?? null,
-    now, req.params.id
-  )
+    const { data, error } = await db
+      .from('deals')
+      .update({
+        name: merged.name,
+        address: merged.address,
+        property_type: merged.propertyType,
+        units: merged.units,
+        sqft: merged.sqft ?? null,
+        purchase_price: merged.purchasePrice,
+        monthly_rent: merged.monthlyRent,
+        financing_type: merged.financingType,
+        interest_rate: merged.interestRate,
+        loan_amount: merged.loanAmount,
+        pm_percent: merged.pmPercent,
+        vacancy_pct: merged.vacancyPct ?? 5,
+        maintenance_reserve_pct: merged.maintenanceReservePct ?? 10,
+        insurance_pct: merged.insurancePct ?? 0.5,
+        tax_pct: merged.taxPct ?? 1.2,
+        notes: merged.notes ?? null,
+        status: merged.status,
+        converted_property_id: merged.convertedPropertyId ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single()
 
-  const saved = db.prepare('SELECT * FROM deals WHERE id = ?').get(req.params.id) as Record<string, unknown>
-  res.json({ success: true, data: rowToDeal(saved) })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: rowToDeal(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.delete('/:id', (req: Request, res: Response) => {
-  const db = getDb()
-  const existing = db.prepare('SELECT id FROM deals WHERE id = ?').get(req.params.id)
-  if (!existing) return res.status(404).json({ success: false, error: 'Deal not found' })
-  db.prepare('DELETE FROM deals WHERE id = ?').run(req.params.id)
-  res.json({ success: true, data: { id: req.params.id } })
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { error } = await db
+      .from('deals')
+      .delete()
+      .eq('id', req.params.id)
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: { id: req.params.id } })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
 export default router

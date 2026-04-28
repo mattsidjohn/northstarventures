@@ -12,11 +12,22 @@ import {
   CreateDealInput,
   UpdateDealInput,
 } from '@northstar/shared-types'
+import { supabase } from '../lib/supabase'
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`
+  }
+  return headers
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = await getAuthHeaders()
   const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) },
   })
   const json = await res.json()
   if (!json.success) throw new Error(json.error ?? 'Request failed')
@@ -79,7 +90,8 @@ export const api = {
 
   backup: {
     export: async () => {
-      const res = await fetch('/api/backup/export')
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/backup/export', { headers })
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

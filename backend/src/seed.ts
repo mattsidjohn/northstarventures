@@ -1,337 +1,272 @@
-/**
- * Seeder for North Star Ventures property data.
- * Bank payments (interest) are baked into the expenses figure for each monthly record.
- * All properties were modeled at 5.75% interest-only when computing seed expenses.
- *
- * Usage: npm run seed            (skip if data exists)
- *        npm run seed:reset      (clear and re-seed)
- */
+import 'dotenv/config'
+import { createClient } from '@supabase/supabase-js'
 
-import { getDb } from './db/database'
-import { v4 as uuidv4 } from 'uuid'
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SEED_USER_ID = process.env.SEED_USER_ID
+const reset = process.argv.includes('--reset')
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SEED_USER_ID) {
+  console.error('Missing env vars. Add to backend/.env:\n  SUPABASE_SERVICE_ROLE_KEY\n  SEED_USER_ID')
+  process.exit(1)
 }
 
-function parseYearMonth(s: string): { year: number; month: number } {
-  const [y, m] = s.split('-').map(Number)
-  return { year: y, month: m }
-}
+// Service role key bypasses RLS so we can seed for a specific user
+const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+})
 
-// ---------------------------------------------------------------------------
-// Property definitions
-// ---------------------------------------------------------------------------
+// ── Seed data ──────────────────────────────────────────────────────────────
 
-interface PropertySeed {
+type PropertySeed = {
   name: string
   address: string
-  propertyType: 'single-family' | 'duplex' | 'multi-unit' | 'commercial' | 'mixed-use'
+  property_type: string
   units: number
   sqft?: number
-  acquisitionDate: string
-  purchasePrice: number
-  estimatedCurrentValue: number
-  notes?: string
-  monthlyRecords: { month: string; income: number; expenses: number }[]
+  purchase_price: number
+  estimated_current_value: number
+  acquisition_date: string
+  monthly: { income: number; expenses: number }
 }
-
-// Expenses include operating costs + 5.75% IO interest on purchase price
-// interest = purchasePrice * 0.0575 / 12
 
 const PROPERTIES: PropertySeed[] = [
   {
-    name: '1008-1012 S Rouse',
-    address: '1008-1012 S Rouse, Springfield, MO',
-    propertyType: 'multi-unit',
-    units: 3,
-    sqft: 2400,
-    acquisitionDate: '2021-03-15',
-    purchasePrice: 170000,
-    estimatedCurrentValue: 230000,
-    notes: '3-unit multi-family. Stable long-term tenants.',
-    monthlyRecords: [
-      { month: '2026-01', income: 2220.00, expenses: 1750.00 },
-      { month: '2026-02', income: 2220.00, expenses: 1750.00 },
-      { month: '2026-03', income: 2220.00, expenses: 1750.00 },
-    ],
-  },
-  {
-    name: '1301 S Virginia',
-    address: '1301 S Virginia Ave, Springfield, MO',
-    propertyType: 'commercial',
-    units: 2,
-    sqft: 3200,
-    acquisitionDate: '2022-06-01',
-    purchasePrice: 340000,
-    estimatedCurrentValue: 385000,
-    notes: 'Commercial property with 2 tenant spaces. Strong cash flow.',
-    monthlyRecords: [
-      { month: '2026-01', income: 5400.00, expenses: 3115.63 },
-      { month: '2026-02', income: 5400.00, expenses: 3115.63 },
-      { month: '2026-03', income: 5400.00, expenses: 3115.63 },
-    ],
-  },
-  {
-    name: '2229-2231 Arizona Ave',
-    address: '2229-2231 Arizona Ave, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 1800,
-    acquisitionDate: '2019-08-15',
-    purchasePrice: 120000,
-    estimatedCurrentValue: 250000,
-    notes: 'Duplex acquired early in portfolio. Significant equity built.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1825.00, expenses: 1074.13 },
-      { month: '2026-02', income: 1825.00, expenses: 1074.13 },
-      { month: '2026-03', income: 1825.00, expenses: 1074.13 },
-    ],
-  },
-  {
-    name: '313-315 Ash Craft',
-    address: '313-315 Ash Craft Blvd, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 2200,
-    acquisitionDate: '2023-04-01',
-    purchasePrice: 305000,
-    estimatedCurrentValue: 325000,
-    notes: 'Recently acquired duplex. Higher debt service relative to income — monitor closely.',
-    monthlyRecords: [
-      { month: '2026-01', income: 2100.00, expenses: 1863.92 },
-      { month: '2026-02', income: 2100.00, expenses: 1863.71 },
-      { month: '2026-03', income: 2100.00, expenses: 1863.71 },
-    ],
-  },
-  {
-    name: '515-517 Jefferson St',
-    address: '515-517 Jefferson St, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 1900,
-    acquisitionDate: '2022-01-10',
-    purchasePrice: 180000,
-    estimatedCurrentValue: 215000,
-    notes: 'Stable duplex. Modest cash flow after debt service.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1650.00, expenses: 1339.59 },
-      { month: '2026-02', income: 1650.00, expenses: 1339.59 },
-      { month: '2026-03', income: 1650.00, expenses: 1339.59 },
-    ],
-  },
-  {
-    name: '702 S Main ST',
-    address: '702 S Main St, Springfield, MO',
-    propertyType: 'commercial',
+    name: '702 S Main St',
+    address: '702 S Main St, Springfield, MO 65806',
+    property_type: 'commercial',
     units: 6,
-    sqft: 8500,
-    acquisitionDate: '2018-05-01',
-    purchasePrice: 1400000,
-    estimatedCurrentValue: 2100000,
-    notes: 'Flagship commercial property. Long-term commercial tenant. Highest income asset in portfolio. NNN-structured lease.',
-    monthlyRecords: [
-      { month: '2026-01', income: 23500.00, expenses: 6165.02 },
-      { month: '2026-02', income: 23500.00, expenses: 6165.02 },
-      { month: '2026-03', income: 23500.00, expenses: 6165.02 },
-    ],
+    sqft: 6800,
+    purchase_price: 800000,
+    estimated_current_value: 920000,
+    acquisition_date: '2019-03-15',
+    monthly: { income: 23500, expenses: 17200 },
   },
   {
-    name: '712 S Virginia',
-    address: '712 S Virginia Ave, Springfield, MO',
-    propertyType: 'commercial',
-    units: 1,
-    sqft: 2800,
-    acquisitionDate: '2021-09-15',
-    purchasePrice: 225000,
-    estimatedCurrentValue: 300000,
-    notes: 'Single commercial unit. Strong income relative to purchase price.',
-    monthlyRecords: [
-      { month: '2026-01', income: 4000.00, expenses: 1149.53 },
-      { month: '2026-02', income: 4000.00, expenses: 1149.53 },
-      { month: '2026-03', income: 4000.00, expenses: 1149.53 },
-    ],
-  },
-  {
-    name: 'Laurel Duplex - Unit 1',
-    address: 'Laurel Duplex Unit 1, Springfield, MO',
-    propertyType: 'duplex',
+    name: '1301 S Virginia Ave',
+    address: '1301 S Virginia Ave, Springfield, MO 65807',
+    property_type: 'commercial',
     units: 2,
-    sqft: 900,
-    acquisitionDate: '2020-07-01',
-    purchasePrice: 225000,
-    estimatedCurrentValue: 260000,
-    notes: 'Half of Laurel Duplex split into separate tracking entities. Low cash flow — watchlist candidate.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1550.00, expenses: 1401.30 },
-      { month: '2026-02', income: 1550.00, expenses: 1401.30 },
-      { month: '2026-03', income: 1550.00, expenses: 1401.30 },
-    ],
-  },
-  {
-    name: 'Laurel Duplex - Unit 2',
-    address: 'Laurel Duplex Unit 2, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 900,
-    acquisitionDate: '2020-07-01',
-    purchasePrice: 225000,
-    estimatedCurrentValue: 260000,
-    notes: 'Half of Laurel Duplex split into separate tracking entities. Low cash flow — watchlist candidate.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1550.00, expenses: 1401.30 },
-      { month: '2026-02', income: 1550.00, expenses: 1401.30 },
-      { month: '2026-03', income: 1550.00, expenses: 1401.30 },
-    ],
+    sqft: 2400,
+    purchase_price: 450000,
+    estimated_current_value: 485000,
+    acquisition_date: '2020-07-01',
+    monthly: { income: 5400, expenses: 3940 },
   },
   {
     name: 'Middle West Building',
-    address: 'Middle West Building, Springfield, MO',
-    propertyType: 'mixed-use',
+    address: '412 W Olive St, Springfield, MO 65806',
+    property_type: 'mixed-use',
     units: 10,
     sqft: 9200,
-    acquisitionDate: '2022-11-01',
-    purchasePrice: 340000,
-    estimatedCurrentValue: 950000,
-    notes: 'Mixed-use building with residential and retail units. Good scale.',
-    monthlyRecords: [
-      { month: '2026-01', income: 7995.00, expenses: 4985.30 },
-      { month: '2026-02', income: 7995.00, expenses: 4985.30 },
-      { month: '2026-03', income: 7995.00, expenses: 4985.30 },
-    ],
+    purchase_price: 650000,
+    estimated_current_value: 700000,
+    acquisition_date: '2020-11-20',
+    monthly: { income: 8000, expenses: 5850 },
   },
   {
-    name: 'Turk Duplex - Unit 1',
-    address: 'Turk Duplex Unit 1, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 850,
-    acquisitionDate: '2020-03-01',
-    purchasePrice: 200000,
-    estimatedCurrentValue: 235000,
-    notes: 'Half of Turk Duplex tracked separately. Adequate cash flow.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1612.50, expenses: 1319.28 },
-      { month: '2026-02', income: 1612.50, expenses: 1319.28 },
-      { month: '2026-03', income: 1612.50, expenses: 1319.28 },
-    ],
+    name: '712 S Virginia Ave',
+    address: '712 S Virginia Ave, Springfield, MO 65807',
+    property_type: 'commercial',
+    units: 1,
+    sqft: 1800,
+    purchase_price: 280000,
+    estimated_current_value: 310000,
+    acquisition_date: '2021-02-10',
+    monthly: { income: 4000, expenses: 2630 },
   },
   {
-    name: 'Turk Duplex - Unit 2',
-    address: 'Turk Duplex Unit 2, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 850,
-    acquisitionDate: '2020-03-01',
-    purchasePrice: 200000,
-    estimatedCurrentValue: 235000,
-    notes: 'Half of Turk Duplex tracked separately. Adequate cash flow.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1612.50, expenses: 1319.28 },
-      { month: '2026-02', income: 1612.50, expenses: 1319.28 },
-      { month: '2026-03', income: 1612.50, expenses: 1319.28 },
-    ],
+    name: '1301 West Central St',
+    address: '1301 W Central St, Springfield, MO 65802',
+    property_type: 'single-family',
+    units: 1,
+    sqft: 1400,
+    purchase_price: 165000,
+    estimated_current_value: 182000,
+    acquisition_date: '2021-06-05',
+    monthly: { income: 1500, expenses: 1280 },
   },
   {
-    name: 'Zora Duplex - Unit 1',
-    address: 'Zora Duplex Unit 1, Springfield, MO',
-    propertyType: 'duplex',
-    units: 2,
-    sqft: 850,
-    acquisitionDate: '2020-03-01',
-    purchasePrice: 200000,
-    estimatedCurrentValue: 240000,
-    notes: 'Half of Zora Duplex tracked separately. Slightly better margins than Turk.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1662.50, expenses: 1330.78 },
-      { month: '2026-02', income: 1662.50, expenses: 1330.78 },
-      { month: '2026-03', income: 1662.50, expenses: 1330.78 },
-    ],
+    name: '1008-1012 S Rouse Ave',
+    address: '1008-1012 S Rouse Ave, Springfield, MO 65804',
+    property_type: 'multi-unit',
+    units: 3,
+    sqft: 3200,
+    purchase_price: 185000,
+    estimated_current_value: 210000,
+    acquisition_date: '2020-04-22',
+    monthly: { income: 2200, expenses: 1740 },
   },
   {
-    name: 'Zora Duplex - Unit 2',
-    address: 'Zora Duplex Unit 2, Springfield, MO',
-    propertyType: 'duplex',
+    name: '2229-2231 Arizona Ave',
+    address: '2229-2231 Arizona Ave, Springfield, MO 65807',
+    property_type: 'duplex',
     units: 2,
-    sqft: 850,
-    acquisitionDate: '2020-03-01',
-    purchasePrice: 200000,
-    estimatedCurrentValue: 240000,
-    notes: 'Half of Zora Duplex tracked separately. Slightly better margins than Turk.',
-    monthlyRecords: [
-      { month: '2026-01', income: 1662.50, expenses: 1330.78 },
-      { month: '2026-02', income: 1662.50, expenses: 1330.78 },
-      { month: '2026-03', income: 1662.50, expenses: 1330.78 },
-    ],
+    sqft: 2100,
+    purchase_price: 175000,
+    estimated_current_value: 200000,
+    acquisition_date: '2019-09-14',
+    monthly: { income: 1800, expenses: 1430 },
+  },
+  {
+    name: '313-315 Ash Craft Ave',
+    address: '313-315 Ash Craft Ave, Springfield, MO 65806',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 2000,
+    purchase_price: 220000,
+    estimated_current_value: 230000,
+    acquisition_date: '2023-01-18',
+    monthly: { income: 1900, expenses: 1800 },
+  },
+  {
+    name: '515-517 Jefferson St',
+    address: '515-517 Jefferson St, Springfield, MO 65806',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 2200,
+    purchase_price: 195000,
+    estimated_current_value: 212000,
+    acquisition_date: '2021-08-30',
+    monthly: { income: 1700, expenses: 1450 },
+  },
+  {
+    name: 'Laurel Duplex — Unit A',
+    address: '814-A E Laurel St, Springfield, MO 65806',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 1800,
+    purchase_price: 140000,
+    estimated_current_value: 155000,
+    acquisition_date: '2020-02-28',
+    monthly: { income: 1100, expenses: 1030 },
+  },
+  {
+    name: 'Laurel Duplex — Unit B',
+    address: '814-B E Laurel St, Springfield, MO 65806',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 1800,
+    purchase_price: 140000,
+    estimated_current_value: 155000,
+    acquisition_date: '2020-02-28',
+    monthly: { income: 1100, expenses: 1030 },
+  },
+  {
+    name: 'Turk Duplex — Unit A',
+    address: '622-A S Turk Ave, Springfield, MO 65804',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 1900,
+    purchase_price: 150000,
+    estimated_current_value: 168000,
+    acquisition_date: '2020-10-07',
+    monthly: { income: 1200, expenses: 1060 },
+  },
+  {
+    name: 'Turk Duplex — Unit B',
+    address: '622-B S Turk Ave, Springfield, MO 65804',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 1900,
+    purchase_price: 150000,
+    estimated_current_value: 168000,
+    acquisition_date: '2020-10-07',
+    monthly: { income: 1200, expenses: 1060 },
+  },
+  {
+    name: 'Zora Duplex — Unit A',
+    address: '508-A E Zora St, Springfield, MO 65803',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 2000,
+    purchase_price: 160000,
+    estimated_current_value: 178000,
+    acquisition_date: '2021-04-12',
+    monthly: { income: 1300, expenses: 1090 },
+  },
+  {
+    name: 'Zora Duplex — Unit B',
+    address: '508-B E Zora St, Springfield, MO 65803',
+    property_type: 'duplex',
+    units: 2,
+    sqft: 2000,
+    purchase_price: 160000,
+    estimated_current_value: 178000,
+    acquisition_date: '2021-04-12',
+    monthly: { income: 1300, expenses: 1090 },
   },
 ]
 
-// ---------------------------------------------------------------------------
-// Seeder
-// ---------------------------------------------------------------------------
+// ── Main ───────────────────────────────────────────────────────────────────
 
-function seed() {
-  const db = getDb()
-  const reset = process.argv.includes('--reset')
+async function main() {
+  if (reset) {
+    console.log('Resetting existing seed data for user…')
+    await db.from('scorecards').delete().eq('user_id', SEED_USER_ID!)
+    await db.from('monthly_data').delete().eq('user_id', SEED_USER_ID!)
+    await db.from('properties').delete().eq('user_id', SEED_USER_ID!)
+    console.log('Reset complete.')
+  }
 
-  const existing = (db.prepare('SELECT COUNT(*) as c FROM properties').get() as { c: number }).c
+  const { data: existing } = await db
+    .from('properties')
+    .select('id')
+    .eq('user_id', SEED_USER_ID!)
+    .limit(1)
 
-  if (existing > 0 && !reset) {
-    console.log(`ℹ️  Database already has ${existing} properties. Run with --reset to clear and re-seed.`)
+  if (existing && existing.length > 0 && !reset) {
+    console.log('Data already exists for this user. Run with --reset to re-seed.')
     process.exit(0)
   }
 
-  if (existing > 0 && reset) {
-    db.prepare('DELETE FROM scorecards').run()
-    db.prepare('DELETE FROM monthly_data').run()
-    db.prepare('DELETE FROM properties').run()
-    console.log('🗑  Cleared existing data.')
+  console.log(`Seeding ${PROPERTIES.length} properties…`)
+
+  for (const prop of PROPERTIES) {
+    const { monthly, ...propData } = prop
+
+    const { data: inserted, error } = await db
+      .from('properties')
+      .insert({
+        user_id: SEED_USER_ID,
+        name: propData.name,
+        address: propData.address,
+        property_type: propData.property_type,
+        units: propData.units,
+        sqft: propData.sqft ?? null,
+        purchase_price: propData.purchase_price,
+        estimated_current_value: propData.estimated_current_value,
+        acquisition_date: propData.acquisition_date,
+      })
+      .select('id')
+      .single()
+
+    if (error || !inserted) {
+      console.error(`  ✗ ${prop.name}: ${error?.message}`)
+      continue
+    }
+
+    // Insert 3 months of data: Jan, Feb, Mar 2026
+    for (const month of [1, 2, 3]) {
+      // Add minor month-to-month variance (±3%)
+      const variance = 1 + (Math.random() * 0.06 - 0.03)
+      await db.from('monthly_data').insert({
+        user_id: SEED_USER_ID,
+        property_id: inserted.id,
+        year: 2026,
+        month,
+        income: Math.round(monthly.income * variance),
+        expenses: Math.round(monthly.expenses * variance),
+      })
+    }
+
+    console.log(`  ✓ ${prop.name}`)
   }
 
-  const insertAll = db.transaction(() => {
-    for (const prop of PROPERTIES) {
-      const propId = uuidv4()
-      const now = new Date().toISOString()
-
-      db.prepare(`
-        INSERT INTO properties (
-          id, name, address, property_type, units, sqft, acquisition_date,
-          purchase_price, estimated_current_value, notes,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        propId, prop.name, prop.address, prop.propertyType, prop.units,
-        prop.sqft ?? null, prop.acquisitionDate,
-        prop.purchasePrice, prop.estimatedCurrentValue, prop.notes ?? null,
-        now, now
-      )
-
-      for (const rec of prop.monthlyRecords) {
-        const { year, month } = parseYearMonth(rec.month)
-        const monthId = uuidv4()
-        const cashFlow = round(rec.income - rec.expenses)
-
-        db.prepare(`
-          INSERT INTO monthly_data (id, property_id, year, month, income, expenses, notes, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(monthId, propId, year, month, rec.income, rec.expenses, null, now, now)
-
-        if (prop.monthlyRecords[0] === rec) {
-          console.log(
-            `  ✓ ${prop.name.padEnd(30)} | Income: $${rec.income.toFixed(0).padStart(6)} | Expenses: $${rec.expenses.toFixed(0).padStart(6)} | CF: $${cashFlow.toFixed(0).padStart(6)}`
-          )
-        }
-      }
-    }
-  })
-
-  console.log('\n📦 Seeding North Star Ventures...\n')
-  insertAll()
-  console.log(`\n✅ Done. Seeded ${PROPERTIES.length} properties with ${PROPERTIES.reduce((s, p) => s + p.monthlyRecords.length, 0)} monthly records.\n`)
+  console.log('\nSeed complete.')
 }
 
-seed()
+main().catch(err => {
+  console.error(err)
+  process.exit(1)
+})

@@ -1,5 +1,7 @@
+import 'dotenv/config'
 import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
+import { requireAuth } from './middleware/auth'
 import propertiesRouter from './routes/properties'
 import monthlyDataRouter from './routes/monthlyData'
 import scorecardsRouter from './routes/scorecards'
@@ -9,8 +11,9 @@ import dealsRouter from './routes/deals'
 
 const app = express()
 const PORT = process.env.PORT ?? 3001
+const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173'
 
-app.use(cors({ origin: 'http://localhost:5173' }))
+app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json({ limit: '5mb' }))
 
 app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -21,14 +24,16 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-app.use('/api/properties', propertiesRouter)
-app.use('/api/properties/:id/monthly', monthlyDataRouter)
-app.use('/api/properties/:id/scorecards', scorecardsRouter)
-app.use('/api/portfolio', portfolioRouter)
-app.use('/api/backup', backupRouter)
-app.use('/api/deals', dealsRouter)
-
+// Public
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
+
+// Protected — all routes require a valid Supabase JWT
+app.use('/api/properties', requireAuth, propertiesRouter)
+app.use('/api/properties/:id/monthly', requireAuth, monthlyDataRouter)
+app.use('/api/properties/:id/scorecards', requireAuth, scorecardsRouter)
+app.use('/api/portfolio', requireAuth, portfolioRouter)
+app.use('/api/backup', requireAuth, backupRouter)
+app.use('/api/deals', requireAuth, dealsRouter)
 
 // Global error handler — prevents stack traces from leaking to clients
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

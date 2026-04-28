@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 const NAV_ITEMS = [
   {
@@ -31,6 +32,8 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
+  const { user, signOut } = useAuth()
+
   return (
     <aside className="w-60 flex flex-col bg-white shadow-sidebar no-print">
       {/* Logo */}
@@ -66,8 +69,21 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-100">
-        <p className="text-[11px] text-gray-400 font-medium">v1.0 · Local First</p>
+      <div className="px-4 py-4 border-t border-gray-100">
+        {user && (
+          <p className="text-[11px] text-gray-400 font-medium truncate mb-2" title={user.email}>
+            {user.email}
+          </p>
+        )}
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sign out
+        </button>
       </div>
     </aside>
   )

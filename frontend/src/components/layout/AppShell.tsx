@@ -1,8 +1,8 @@
-import { Outlet } from 'react-router-dom'
+import { ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 
-export default function AppShell() {
+export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#F2F2F7' }}>
       {/* Sidebar — desktop only */}
@@ -12,7 +12,7 @@ export default function AppShell() {
 
       {/* Main scroll area */}
       <main className="flex-1 overflow-y-auto no-scrollbar pb-20 md:pb-0">
-        <Outlet />
+        {children}
       </main>
 
       {/* Bottom nav — mobile only */}

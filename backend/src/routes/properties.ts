@@ -1,85 +1,119 @@
 import { Router, Request, Response } from 'express'
-import { v4 as uuidv4 } from 'uuid'
-import { getDb } from '../db/database'
+import { createUserClient } from '../lib/supabase'
 import { CreatePropertyInput, UpdatePropertyInput } from '@northstar/shared-types'
 import { rowToProperty } from './propertyHelpers'
 
 const router = Router()
 
-router.get('/', (_req: Request, res: Response) => {
-  const db = getDb()
-  const rows = db.prepare('SELECT * FROM properties ORDER BY name ASC').all() as Record<string, unknown>[]
-  res.json({ success: true, data: rows.map(rowToProperty) })
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { data, error } = await db
+      .from('properties')
+      .select('*')
+      .order('name', { ascending: true })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: (data ?? []).map(rowToProperty) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.get('/:id', (req: Request, res: Response) => {
-  const db = getDb()
-  const row = db.prepare('SELECT * FROM properties WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
-  if (!row) return res.status(404).json({ success: false, error: 'Property not found' })
-  res.json({ success: true, data: rowToProperty(row) })
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { data, error } = await db
+      .from('properties')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+    if (error || !data) return res.status(404).json({ success: false, error: 'Property not found' })
+    res.json({ success: true, data: rowToProperty(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.post('/', (req: Request, res: Response) => {
-  const db = getDb()
-  const input = req.body as CreatePropertyInput
-  const now = new Date().toISOString()
-  const id = uuidv4()
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const input = req.body as CreatePropertyInput
 
-  db.prepare(`
-    INSERT INTO properties (
-      id, name, address, property_type, units, sqft, acquisition_date,
-      purchase_price, estimated_current_value, notes,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, input.name, input.address, input.propertyType, input.units,
-    input.sqft ?? null, input.acquisitionDate ?? null,
-    input.purchasePrice ?? 0, input.estimatedCurrentValue ?? 0, input.notes ?? null,
-    now, now
-  )
+    const { data, error } = await db
+      .from('properties')
+      .insert({
+        user_id: req.userId,
+        name: input.name,
+        address: input.address,
+        property_type: input.propertyType,
+        units: input.units ?? 1,
+        sqft: input.sqft ?? null,
+        acquisition_date: input.acquisitionDate ?? null,
+        purchase_price: input.purchasePrice ?? 0,
+        estimated_current_value: input.estimatedCurrentValue ?? 0,
+        notes: input.notes ?? null,
+      })
+      .select()
+      .single()
 
-  const created = db.prepare('SELECT * FROM properties WHERE id = ?').get(id) as Record<string, unknown>
-  res.status(201).json({ success: true, data: rowToProperty(created) })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.status(201).json({ success: true, data: rowToProperty(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.put('/:id', (req: Request, res: Response) => {
-  const db = getDb()
-  const existing = db.prepare('SELECT * FROM properties WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
-  if (!existing) return res.status(404).json({ success: false, error: 'Property not found' })
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const input = req.body as UpdatePropertyInput
 
-  const input = req.body as UpdatePropertyInput
-  const now = new Date().toISOString()
+    // Verify the property exists and belongs to this user (RLS enforces the latter)
+    const { data: existing } = await db
+      .from('properties')
+      .select('id')
+      .eq('id', req.params.id)
+      .single()
+    if (!existing) return res.status(404).json({ success: false, error: 'Property not found' })
 
-  db.prepare(`
-    UPDATE properties SET
-      name = COALESCE(?, name),
-      address = COALESCE(?, address),
-      property_type = COALESCE(?, property_type),
-      units = COALESCE(?, units),
-      sqft = COALESCE(?, sqft),
-      acquisition_date = COALESCE(?, acquisition_date),
-      purchase_price = COALESCE(?, purchase_price),
-      estimated_current_value = COALESCE(?, estimated_current_value),
-      notes = COALESCE(?, notes),
-      updated_at = ?
-    WHERE id = ?
-  `).run(
-    input.name ?? null, input.address ?? null, input.propertyType ?? null,
-    input.units ?? null, input.sqft ?? null, input.acquisitionDate ?? null,
-    input.purchasePrice ?? null, input.estimatedCurrentValue ?? null, input.notes ?? null,
-    now, req.params.id
-  )
+    // Build update object — only include fields present in the request
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    if (input.name !== undefined)                 updates.name = input.name
+    if (input.address !== undefined)              updates.address = input.address
+    if (input.propertyType !== undefined)         updates.property_type = input.propertyType
+    if (input.units !== undefined)                updates.units = input.units
+    if (input.sqft !== undefined)                 updates.sqft = input.sqft
+    if (input.acquisitionDate !== undefined)      updates.acquisition_date = input.acquisitionDate
+    if (input.purchasePrice !== undefined)        updates.purchase_price = input.purchasePrice
+    if (input.estimatedCurrentValue !== undefined) updates.estimated_current_value = input.estimatedCurrentValue
+    if (input.notes !== undefined)                updates.notes = input.notes
 
-  const updated = db.prepare('SELECT * FROM properties WHERE id = ?').get(req.params.id) as Record<string, unknown>
-  res.json({ success: true, data: rowToProperty(updated) })
+    const { data, error } = await db
+      .from('properties')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: rowToProperty(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.delete('/:id', (req: Request, res: Response) => {
-  const db = getDb()
-  const existing = db.prepare('SELECT id FROM properties WHERE id = ?').get(req.params.id)
-  if (!existing) return res.status(404).json({ success: false, error: 'Property not found' })
-  db.prepare('DELETE FROM properties WHERE id = ?').run(req.params.id)
-  res.json({ success: true, data: { id: req.params.id } })
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { error } = await db
+      .from('properties')
+      .delete()
+      .eq('id', req.params.id)
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: { id: req.params.id } })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
 export default router

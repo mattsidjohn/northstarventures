@@ -1,54 +1,78 @@
 import { Router, Request, Response } from 'express'
-import { v4 as uuidv4 } from 'uuid'
-import { getDb } from '../db/database'
+import { createUserClient } from '../lib/supabase'
 import { CreateMonthlyDataInput } from '@northstar/shared-types'
 import { rowToMonthlyData } from './monthlyDataHelpers'
 
 const router = Router({ mergeParams: true })
 
-router.get('/', (req: Request, res: Response) => {
-  const db = getDb()
-  const rows = db
-    .prepare('SELECT * FROM monthly_data WHERE property_id = ? ORDER BY year DESC, month DESC')
-    .all(req.params.id) as Record<string, unknown>[]
-  res.json({ success: true, data: rows.map(rowToMonthlyData) })
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { data, error } = await db
+      .from('monthly_data')
+      .select('*')
+      .eq('property_id', req.params.id)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: (data ?? []).map(rowToMonthlyData) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.post('/', (req: Request, res: Response) => {
-  const db = getDb()
-  const input = req.body as CreateMonthlyDataInput
-  const now = new Date().toISOString()
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const input = req.body as CreateMonthlyDataInput
 
-  const existing = db
-    .prepare('SELECT id FROM monthly_data WHERE property_id = ? AND year = ? AND month = ?')
-    .get(req.params.id, input.year, input.month) as { id: string } | undefined
+    // Check whether an entry already exists (determines 200 vs 201 response code)
+    const { data: existing } = await db
+      .from('monthly_data')
+      .select('id')
+      .eq('property_id', req.params.id)
+      .eq('year', input.year)
+      .eq('month', input.month)
+      .maybeSingle()
 
-  const id = existing?.id ?? uuidv4()
+    const { data, error } = await db
+      .from('monthly_data')
+      .upsert(
+        {
+          property_id: req.params.id,
+          user_id: req.userId,
+          year: input.year,
+          month: input.month,
+          income: input.income ?? 0,
+          expenses: input.expenses ?? 0,
+          notes: input.notes ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'property_id,year,month' }
+      )
+      .select()
+      .single()
 
-  db.prepare(`
-    INSERT INTO monthly_data (id, property_id, year, month, income, expenses, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(property_id, year, month) DO UPDATE SET
-      income = excluded.income,
-      expenses = excluded.expenses,
-      notes = excluded.notes,
-      updated_at = excluded.updated_at
-  `).run(
-    id, req.params.id, input.year, input.month,
-    input.income ?? 0, input.expenses ?? 0,
-    input.notes ?? null, now, now
-  )
-
-  const saved = db.prepare('SELECT * FROM monthly_data WHERE id = ?').get(id) as Record<string, unknown>
-  res.status(existing ? 200 : 201).json({ success: true, data: rowToMonthlyData(saved) })
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.status(existing ? 200 : 201).json({ success: true, data: rowToMonthlyData(data) })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
-router.delete('/:monthId', (req: Request, res: Response) => {
-  const db = getDb()
-  db.prepare('DELETE FROM monthly_data WHERE id = ? AND property_id = ?').run(
-    req.params.monthId, req.params.id
-  )
-  res.json({ success: true, data: { id: req.params.monthId } })
+router.delete('/:monthId', async (req: Request, res: Response) => {
+  try {
+    const db = createUserClient(req.userToken)
+    const { error } = await db
+      .from('monthly_data')
+      .delete()
+      .eq('id', req.params.monthId)
+      .eq('property_id', req.params.id)
+    if (error) return res.status(500).json({ success: false, error: error.message })
+    res.json({ success: true, data: { id: req.params.monthId } })
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
 })
 
 export default router

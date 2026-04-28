@@ -4,10 +4,8 @@ import {
   Scorecard,
   SemiAnnualMetrics,
 } from '@northstar/shared-types'
-import { v4 as uuidv4 } from 'uuid'
 
 // Score based on cash flow margin (cashFlow / income).
-// 5/5 = 10%+ of total rent retained as cash flow.
 export function scoreFinancial(metrics: SemiAnnualMetrics): CategoryScore {
   const { totals } = metrics
   const factors: string[] = []
@@ -90,13 +88,13 @@ export function recommendDecision(
   }
 }
 
+// Returns scorecard data without an id — the DB generates it on upsert.
 export function buildScorecard(
   propertyId: string,
   year: number,
   period: 'H1' | 'H2',
   metrics: SemiAnnualMetrics,
-  existingId?: string
-): Scorecard {
+): Omit<Scorecard, 'id'> {
   const financial = scoreFinancial(metrics)
   const overallScore = financial.score
   const interpretation = interpretScore(overallScore)
@@ -104,7 +102,6 @@ export function buildScorecard(
 
   const now = new Date().toISOString()
   return {
-    id: existingId ?? uuidv4(),
     propertyId,
     year,
     period,
