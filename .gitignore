@@ -3,8 +3,7 @@ node_modules/
 
 # Build outputs
 dist/
-backend/dist/
-frontend/dist/
+.next/
 
 # Database — local data file, never commit
 *.db
