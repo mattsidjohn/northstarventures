@@ -2,17 +2,30 @@
   "name": "northstar-ventures",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "packages/*",
-    "backend",
-    "frontend"
-  ],
   "scripts": {
-    "dev": "concurrently --names \"api,web\" --prefix-colors \"blue,green\" \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
-    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
-    "install:all": "npm install"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed": "ts-node --transpile-only scripts/seed.ts",
+    "seed:reset": "ts-node --transpile-only scripts/seed.ts -- --reset"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.4.0",
+    "@supabase/supabase-js": "^2.43.4",
+    "next": "^14.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@types/node": "^20.14.2",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
   }
 }
