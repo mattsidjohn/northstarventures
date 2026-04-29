@@ -1,9 +1,9 @@
 {
-  "/api/properties/[id]/scorecards/route": "app/api/properties/[id]/scorecards/route.js",
+  "/api/deals/route": "app/api/deals/route.js",
   "/api/properties/route": "app/api/properties/route.js",
-  "/api/properties/[id]/route": "app/api/properties/[id]/route.js",
+  "/api/properties/[id]/scorecards/route": "app/api/properties/[id]/scorecards/route.js",
   "/api/properties/[id]/monthly/route": "app/api/properties/[id]/monthly/route.js",
-  "/(app)/properties/page": "app/(app)/properties/page.js",
+  "/(app)/deal-analyzer/page": "app/(app)/deal-analyzer/page.js",
   "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
-  "/(app)/properties/[id]/page": "app/(app)/properties/[id]/page.js"
+  "/(app)/properties/page": "app/(app)/properties/page.js"
 }

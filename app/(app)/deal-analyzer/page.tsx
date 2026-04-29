@@ -117,19 +117,19 @@ function printDeal(form: FormState, result: ProFormaResult): void {
   <!-- Score + Cash Flow -->
   <div style="display:flex;gap:16px;margin-bottom:18px;align-items:stretch;">
     <div style="flex:1;border:2px solid ${sc};border-radius:8px;padding:14px 18px;">
-      <div class="section-title" style="margin-bottom:10px;">Pro-Forma Score</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="section-title" style="margin:0;">Pro-Forma Score</div>
+        <div style="display:inline-block;background:${dbg};color:${sc};font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid ${sc};">${result.decision}</div>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
         <div style="width:40px;height:40px;border-radius:50%;background:${sc};color:white;font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;">${result.score}</div>
-        <div>
-          <div style="font-size:11px;color:#6b7280;">out of 5</div>
-          <div style="display:inline-block;background:${dbg};color:${sc};font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid ${sc};margin-top:2px;">${result.decision}</div>
-        </div>
+        <div style="font-size:11px;color:#6b7280;">out of 5</div>
       </div>
       <div style="font-size:11px;color:#6b7280;line-height:1.5;">${DECISION_CONTEXT[result.decision]}</div>
     </div>
     <div style="width:180px;border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;background:#f8fafc;">
-      <div class="section-title">Monthly Cash Flow</div>
-      <div style="font-size:26px;font-weight:800;color:${result.lines.cashFlow >= 0 ? '#059669' : '#dc2626'};">${fc(result.lines.cashFlow)}</div>
+      <div class="section-title">Actual Cash Flow</div>
+      <div style="font-size:26px;font-weight:800;color:${result.lines.actualCashFlow >= 0 ? '#059669' : '#dc2626'};">${fc(result.lines.actualCashFlow)}</div>
       <div style="font-size:11px;color:#6b7280;margin-top:2px;">per month</div>
       <div style="font-size:12px;font-weight:700;margin-top:6px;color:${result.cashFlowMargin >= 20 ? '#059669' : result.cashFlowMargin >= 10 ? '#16a34a' : result.cashFlowMargin >= 5 ? '#d97706' : '#dc2626'};">${result.cashFlowMargin.toFixed(1)}% rent margin</div>
     </div>
@@ -512,8 +512,8 @@ function ProjectionSection({ inputs, result }: { inputs: ProFormaInputs; result:
 
         {/* 20-Year cumulative return area chart */}
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Cumulative Return (20 Years)</p>
-        <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={areaData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={areaData} margin={{ top: 4, right: 4, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="returnGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />

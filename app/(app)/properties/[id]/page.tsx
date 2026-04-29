@@ -58,7 +58,7 @@ export default function PropertyDetail() {
   const isNew = id === 'new'
   const { property, loading, refetch } = useProperty(isNew ? '' : id!)
   const { createProperty, updateProperty } = useProperties()
-  const { monthlyData, upsertEntry, getEntry } = useMonthlyData(isNew ? '' : id!)
+  const { monthlyData, upsertEntry, deleteEntry, getEntry } = useMonthlyData(isNew ? '' : id!)
   const { getScorecard, generate, update } = useScorecard(isNew ? '' : id!)
 
   const [isEditing, setIsEditing] = useState(false)
@@ -75,10 +75,10 @@ export default function PropertyDetail() {
     return { income: prior?.income ?? 0, expenses: prior?.expenses ?? 0, notes: '' }
   }
 
-  function openEntryForm(seed?: MonthlyData) {
-    const year = seed?.year ?? now.getFullYear()
-    const month = seed?.month ?? (now.getMonth() + 1)
-    const existing = seed ?? getEntry(year, month)
+  function openEntryForm() {
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const existing = getEntry(year, month)
     setEntryForm({ year, month, ...entryDefaults(year, month, existing) })
     setEntrySaved(false)
   }
@@ -331,7 +331,7 @@ export default function PropertyDetail() {
                     <div className="bg-white rounded-2xl shadow-card p-6 space-y-5">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-gray-700">
-                          {monthlyData.find(m => m.year === entryForm.year && m.month === entryForm.month) ? 'Edit Entry' : 'Add Entry'}
+                          Add Entry
                         </h3>
                         <button onClick={() => setEntryForm(null)} className="text-sm text-gray-400 hover:text-gray-600">Cancel</button>
                       </div>
@@ -419,7 +419,8 @@ export default function PropertyDetail() {
                   )}
                   <MonthlyHistoryTable
                     monthlyData={monthlyData}
-                    onEdit={entry => openEntryForm(entry)}
+                    onSave={async input => { await upsertEntry(input) }}
+                    onDelete={async id => { await deleteEntry(id) }}
                   />
                 </div>
               ),

@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/(app)/dashboard/page": [
+    "/(app)/deal-analyzer/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(app)/dashboard/page.js"
+      "static/chunks/app/(app)/deal-analyzer/page.js"
     ],
     "/(app)/layout": [
       "static/chunks/webpack.js",
@@ -16,15 +16,15 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/(app)/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(app)/dashboard/page.js"
+    ],
     "/(app)/properties/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(app)/properties/page.js"
-    ],
-    "/(app)/properties/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(app)/properties/[id]/page.js"
     ]
   }
 }
