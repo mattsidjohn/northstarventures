@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ResponsiveContainer, BarChart, Bar, AreaChart, Area,
@@ -583,12 +583,13 @@ function ProjectionSection({ inputs, result }: { inputs: ProFormaInputs; result:
 
 // ── Detail/edit view ───────────────────────────────────────────────────────
 
-function DealDetail({ form, setForm, result, onBack, onSave, onConvert, saving, saveFeedback, converting }: {
+function DealDetail({ form, setForm, result, onBack, onSave, onAutoSave, onConvert, saving, saveFeedback, converting }: {
   form: FormState
   setForm: React.Dispatch<React.SetStateAction<FormState>>
   result: ProFormaResult | null
   onBack: () => void
   onSave: () => void
+  onAutoSave: () => void
   onConvert: () => void
   saving: boolean
   saveFeedback: boolean
@@ -638,7 +639,9 @@ function DealDetail({ form, setForm, result, onBack, onSave, onConvert, saving, 
   }
 
   return (
-    <div>
+    <div onBlur={e => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) onAutoSave()
+    }}>
       <Header
         title={form.activeDealId ? form.name || 'Edit Deal' : 'New Deal'}
         subtitle={form.activeDealId ? 'Edit deal details' : 'Analyze a potential acquisition'}
@@ -947,6 +950,10 @@ export default function DealAnalyzer() {
   const [converting, setConverting] = useState<string | null>(null)
   const [saveFeedback, setSaveFeedback] = useState(false)
 
+  const formRef = useRef(form)
+  formRef.current = form
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
+
   const result = useMemo(() => computeProForma(form.inputs), [form.inputs])
 
   function openNew() {
@@ -966,21 +973,22 @@ export default function DealAnalyzer() {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) return
+    const f = formRef.current
+    if (!f.name.trim()) return
     setSaving(true)
     try {
       const payload = {
-        name: form.name.trim(), address: form.address, propertyType: form.propertyType,
-        units: form.units, sqft: form.sqft,
-        purchasePrice: form.inputs.purchasePrice, monthlyRent: form.inputs.monthlyRent,
-        financingType: form.inputs.financingType, interestRate: form.inputs.interestRate,
-        loanAmount: form.inputs.loanAmount, pmPercent: form.inputs.pmPercent,
-        vacancyPct: form.inputs.vacancyPct ?? 5, maintenanceReservePct: form.inputs.maintenanceReservePct ?? 10,
-        insurancePct: form.inputs.insurancePct ?? 0.5, taxPct: form.inputs.taxPct ?? 1.2,
+        name: f.name.trim(), address: f.address, propertyType: f.propertyType,
+        units: f.units, sqft: f.sqft,
+        purchasePrice: f.inputs.purchasePrice, monthlyRent: f.inputs.monthlyRent,
+        financingType: f.inputs.financingType, interestRate: f.inputs.interestRate,
+        loanAmount: f.inputs.loanAmount, pmPercent: f.inputs.pmPercent,
+        vacancyPct: f.inputs.vacancyPct ?? 5, maintenanceReservePct: f.inputs.maintenanceReservePct ?? 10,
+        insurancePct: f.inputs.insurancePct ?? 0.5, taxPct: f.inputs.taxPct ?? 1.2,
         status: 'active' as const,
       }
-      if (form.activeDealId) {
-        await updateDeal(form.activeDealId, payload)
+      if (f.activeDealId) {
+        await updateDeal(f.activeDealId, payload)
       } else {
         const created = await createDeal(payload)
         setForm(prev => ({ ...prev, activeDealId: created.id }))
@@ -991,6 +999,13 @@ export default function DealAnalyzer() {
       setSaving(false)
     }
   }
+
+  const scheduleAutoSave = useCallback(() => {
+    clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      if (formRef.current.name.trim() && !saving) handleSave()
+    }, 600)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleConvertForm() {
     const useName = form.name.trim()
@@ -1049,6 +1064,7 @@ export default function DealAnalyzer() {
         result={result}
         onBack={goBack}
         onSave={handleSave}
+        onAutoSave={scheduleAutoSave}
         onConvert={handleConvertForm}
         saving={saving}
         saveFeedback={saveFeedback}
