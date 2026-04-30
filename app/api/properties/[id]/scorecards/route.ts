@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { Scorecard } from '@/types'
 import { calculateSemiAnnualMetrics } from '@/lib/services/metricsService'
 import { buildScorecard } from '@/lib/services/scorecardService'
@@ -40,16 +40,17 @@ function rowToScorecard(row: Record<string, unknown>): Scorecard {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { data, error } = await supabase
       .from('scorecards')
       .select('*')
       .eq('property_id', id)
+      .eq('user_id', userId)
       .order('year', { ascending: false })
       .order('period', { ascending: false })
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -62,9 +63,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { year, period } = await request.json() as { year: number; period: 'H1' | 'H2' }
     if (!Number.isInteger(year) || year < 2000 || year > 2100) {
       return NextResponse.json({ success: false, error: 'Invalid year' }, { status: 400 })
@@ -76,12 +77,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .from('properties')
       .select('id')
       .eq('id', id)
+      .eq('user_id', userId)
       .single()
     if (!property) return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
     const { data: monthlyRows, error: mErr } = await supabase
       .from('monthly_data')
       .select('*')
       .eq('property_id', id)
+      .eq('user_id', userId)
     if (mErr) return NextResponse.json({ success: false, error: mErr.message }, { status: 500 })
     const monthlyData = (monthlyRows ?? []).map(rowToMonthlyData)
     const semiAnnual = calculateSemiAnnualMetrics(monthlyData, year, period)
@@ -91,7 +94,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .upsert(
         {
           property_id: id,
-          user_id: user.id,
+          user_id: userId,
           year,
           period,
           financial_score: scorecard.financial.score,

@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { UpdatePropertyInput } from '@/types'
 
 function rowToProperty(row: Record<string, unknown>) {
@@ -19,16 +19,17 @@ function rowToProperty(row: Record<string, unknown>) {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { data, error } = await supabase
       .from('properties')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userId)
       .single()
     if (error || !data) return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
     return NextResponse.json({ success: true, data: rowToProperty(data) })
@@ -40,14 +41,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const input = await request.json() as UpdatePropertyInput
     const { data: existing } = await supabase
       .from('properties')
       .select('id')
       .eq('id', id)
+      .eq('user_id', userId)
       .single()
     if (!existing) return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -64,6 +66,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       .from('properties')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', userId)
       .select()
       .single()
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -73,16 +76,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { error } = await supabase
       .from('properties')
       .delete()
       .eq('id', id)
+      .eq('user_id', userId)
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, data: { id } })
   } catch {

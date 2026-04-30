@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { Scorecard, UpdateScorecardInput } from '@/types'
 
 function rowToScorecard(row: Record<string, unknown>): Scorecard {
@@ -27,15 +27,16 @@ function rowToScorecard(row: Record<string, unknown>): Scorecard {
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string; scorecardId: string }> }) {
   try {
     const { id, scorecardId } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const update = await request.json() as UpdateScorecardInput
     const { data: existing } = await supabase
       .from('scorecards')
       .select('id')
       .eq('id', scorecardId)
       .eq('property_id', id)
+      .eq('user_id', userId)
       .single()
     if (!existing) return NextResponse.json({ success: false, error: 'Scorecard not found' }, { status: 404 })
     const { data, error } = await supabase

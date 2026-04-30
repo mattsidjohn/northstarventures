@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
+const SUPER_ADMIN_EMAIL = 'mattsidjohn@gmail.com'
+
 const NAV_ITEMS = [
   {
     href: '/dashboard',
@@ -72,6 +74,25 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Admin link — super admin only */}
+      {user?.email === SUPER_ADMIN_EMAIL && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/admin"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+              pathname === '/admin'
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93C9.33 17.79 7 14.5 7 11V7.18L12 5z"/>
+            </svg>
+            Admin
+          </Link>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-4 border-t border-gray-100">

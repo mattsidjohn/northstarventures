@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+
+const SUPER_ADMIN_EMAIL = 'mattsidjohn@gmail.com'
 
 const NAV_ITEMS = [
   {
@@ -45,11 +48,21 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { user } = useAuth()
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-black/[0.06] pb-safe no-print">
       <div className="flex">
-        {NAV_ITEMS.map(item => {
+        {[...NAV_ITEMS, ...(isSuperAdmin ? [{
+          href: '/admin',
+          label: 'Admin',
+          icon: (
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93C9.33 17.79 7 14.5 7 11V7.18L12 5z"/>
+            </svg>
+          ),
+        }] : [])].map(item => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link

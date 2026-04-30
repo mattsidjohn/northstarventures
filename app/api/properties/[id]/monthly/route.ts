@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { CreateMonthlyDataInput } from '@/types'
 
 function rowToMonthlyData(row: Record<string, unknown>) {
@@ -16,16 +16,17 @@ function rowToMonthlyData(row: Record<string, unknown>) {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { data, error } = await supabase
       .from('monthly_data')
       .select('*')
       .eq('property_id', id)
+      .eq('user_id', userId)
       .order('year', { ascending: false })
       .order('month', { ascending: false })
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -38,14 +39,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const input = await request.json() as CreateMonthlyDataInput
     const { data: existing } = await supabase
       .from('monthly_data')
       .select('id')
       .eq('property_id', id)
+      .eq('user_id', userId)
       .eq('year', input.year)
       .eq('month', input.month)
       .maybeSingle()
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .upsert(
         {
           property_id: id,
-          user_id: user.id,
+          user_id: userId,
           year: input.year,
           month: input.month,
           income: input.income ?? 0,

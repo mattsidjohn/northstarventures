@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { PortfolioSummary, SemiAnnualTotals } from '@/types'
 import { calculateSemiAnnualMetrics } from '@/lib/services/metricsService'
 
@@ -36,9 +36,9 @@ function rowToMonthlyData(row: Record<string, unknown>) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
 
     const rawYear = parseInt(request.nextUrl.searchParams.get('year') ?? '')
     const year = Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= 2100
@@ -50,9 +50,9 @@ export async function GET(request: NextRequest) {
       : (new Date().getMonth() < 6 ? 'H1' : 'H2')
 
     const [propResult, monthlyResult, scorecardResult] = await Promise.all([
-      supabase.from('properties').select('*'),
-      supabase.from('monthly_data').select('*'),
-      supabase.from('scorecards').select('*').eq('year', year).eq('period', period),
+      supabase.from('properties').select('*').eq('user_id', userId),
+      supabase.from('monthly_data').select('*').eq('user_id', userId),
+      supabase.from('scorecards').select('*').eq('user_id', userId).eq('year', year).eq('period', period),
     ])
 
     if (propResult.error) return NextResponse.json({ success: false, error: propResult.error.message }, { status: 500 })

@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []
@@ -28,9 +28,9 @@ const REQUIRED_COLS = ['property_id', 'property_name', 'address', 'property_type
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
 
     const csvText = await request.text()
     const rows = parseCsv(csvText)
@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Full replace — delete in dependency order
-    await supabase.from('scorecards').delete().eq('user_id', user.id)
-    await supabase.from('monthly_data').delete().eq('user_id', user.id)
-    await supabase.from('properties').delete().eq('user_id', user.id)
+    await supabase.from('scorecards').delete().eq('user_id', userId)
+    await supabase.from('monthly_data').delete().eq('user_id', userId)
+    await supabase.from('properties').delete().eq('user_id', userId)
 
     let propCount = 0
     let monthlyCount = 0
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       const { data: inserted, error: propErr } = await supabase
         .from('properties')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           name: fields.property_name,
           address: fields.address,
           property_type: fields.property_type,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         if (!year || !month || isNaN(income) || isNaN(expenses)) continue
 
         await supabase.from('monthly_data').insert({
-          user_id: user.id,
+          user_id: userId,
           property_id: inserted.id,
           year,
           month,

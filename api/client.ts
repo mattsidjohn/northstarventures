@@ -12,11 +12,24 @@ import {
   UpdateDealInput,
 } from '@/types'
 
+function impersonationHeader(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = localStorage.getItem('nsv_impersonate')
+    if (!stored) return {}
+    const { userId } = JSON.parse(stored) as { userId: string }
+    return userId ? { 'x-impersonate-user-id': userId } : {}
+  } catch {
+    return {}
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...impersonationHeader(),
       ...(options?.headers as Record<string, string> | undefined),
     },
   })

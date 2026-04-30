@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 
 function csvCell(value: string | number | null | undefined): string {
   const s = String(value ?? '')
@@ -15,15 +16,15 @@ const HEADERS = [
   'year', 'month', 'income', 'expenses',
 ].join(',')
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new Response('Unauthorized', { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return new Response('Unauthorized', { status: 401 })
+    const { supabase, userId } = ctx
 
     const [propResult, monthlyResult] = await Promise.all([
-      supabase.from('properties').select('*').order('name'),
-      supabase.from('monthly_data').select('*').order('year').order('month'),
+      supabase.from('properties').select('*').eq('user_id', userId).order('name'),
+      supabase.from('monthly_data').select('*').eq('user_id', userId).order('year').order('month'),
     ])
 
     const properties = propResult.data ?? []

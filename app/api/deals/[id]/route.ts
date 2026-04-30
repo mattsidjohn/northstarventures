@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { Deal, UpdateDealInput } from '@/types'
 
 function rowToDeal(row: Record<string, unknown>): Deal {
@@ -31,14 +31,15 @@ function rowToDeal(row: Record<string, unknown>): Deal {
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const input = await request.json() as UpdateDealInput
     const { data: existing, error: fetchErr } = await supabase
       .from('deals')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userId)
       .single()
     if (fetchErr || !existing) return NextResponse.json({ success: false, error: 'Deal not found' }, { status: 404 })
     const merged = { ...rowToDeal(existing), ...input }
@@ -66,6 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('user_id', userId)
       .select()
       .single()
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -75,16 +77,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { error } = await supabase
       .from('deals')
       .delete()
       .eq('id', id)
+      .eq('user_id', userId)
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, data: { id } })
   } catch {

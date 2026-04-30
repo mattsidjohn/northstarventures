@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getEffectiveUser } from '@/lib/supabase/admin-client'
 import { Deal, CreateDealInput } from '@/types'
 
 function rowToDeal(row: Record<string, unknown>): Deal {
@@ -28,14 +28,15 @@ function rowToDeal(row: Record<string, unknown>): Deal {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const { data, error } = await supabase
       .from('deals')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, data: (data ?? []).map(rowToDeal) })
@@ -46,14 +47,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getEffectiveUser(request)
+    if (!ctx) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const { supabase, userId } = ctx
     const input = await request.json() as CreateDealInput
     const { data, error } = await supabase
       .from('deals')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         name: input.name,
         address: input.address ?? '',
         property_type: input.propertyType ?? 'single-family',
